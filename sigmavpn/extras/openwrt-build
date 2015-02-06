@@ -1,0 +1,52 @@
+#!/bin/bash
+
+mkdir -p staging
+
+export VERSION="0.3"
+
+export INSTALLDIR=staging
+export BINDIR=$INSTALLDIR/usr/bin
+export SYSCONFDIR=$INSTALLDIR/etc
+export LIBEXECDIR=$INSTALLDIR/usr/lib/sigmavpn
+
+export SODIUM_CPPFLAGS="-I../opkg/libsodium/usr/include"
+export SODIUM_LDFLAGS="-L../opkg/libsodium/usr/lib -lsodium"
+
+export CC=mips-openwrt-linux-gcc
+export LD=mips-openwrt-linux-ld
+
+make
+make install
+make clean
+
+cd staging
+mkdir etc/init.d/
+cp ../extras/openwrt-init etc/init.d/sigmavpn
+chmod +x etc/init.d/sigmavpn
+
+echo "2.0" > debian-binary
+
+cat << EOF > control
+Package: sigmavpn
+Priority: optional
+Section: misc
+Version: $VERSION
+Architecture: ar71xx
+Source: https://github.com/neilalexander/sigmavpn
+Depends: libsodium(>=0.4.5),libpthread
+Maintainer: neilalexander@frozenriver.net
+Description: SigmaVPN.
+ Simple VPN software written using the NaCl/libsodium library.
+EOF
+
+tar cvzf data.tar.gz etc usr
+tar cvzf control.tar.gz control
+
+REV=`git rev-parse HEAD`
+
+if [ "$REV" == "" ];
+then
+	REV="$VERSION-rel"
+fi
+
+ar -r ../sigmavpn-openwrt-ar71xx-$REV.opk *.tar.gz debian-binary
